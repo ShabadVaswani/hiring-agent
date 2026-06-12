@@ -9,6 +9,27 @@ import {
   useState,
 } from "react";
 
+const GITHUB_OAUTH_ORIGIN = process.env.NEXT_PUBLIC_APP_URL ?? "";
+
+function isOnGithubOAuthOrigin(): boolean {
+  if (typeof window === "undefined") return false;
+  if (!GITHUB_OAUTH_ORIGIN) return true;
+  try {
+    return window.location.origin === new URL(GITHUB_OAUTH_ORIGIN).origin;
+  } catch {
+    return true;
+  }
+}
+
+function githubOAuthUrl(path: string): string {
+  const suffix = path.startsWith("/") ? path : `/${path}`;
+  if (GITHUB_OAUTH_ORIGIN) {
+    return `${GITHUB_OAUTH_ORIGIN.replace(/\/$/, "")}${suffix}`;
+  }
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  return `${basePath}${suffix}`;
+}
+
 type CategoryScore = { score: number; max: number; evidence: string };
 
 type Evaluation = {
@@ -174,6 +195,7 @@ export default function HomePage() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [rawOpen, setRawOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [onOAuthOrigin, setOnOAuthOrigin] = useState(true);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [stageIndex, setStageIndex] = useState(0);
@@ -188,6 +210,10 @@ export default function HomePage() {
   const refreshGithubSession = useCallback(async () => {
     setGithubLoading(true);
     try {
+      if (!isOnGithubOAuthOrigin()) {
+        setGithubLogin(null);
+        return;
+      }
       const res = await fetch(`${basePath}/api/auth/github/session`);
       const data = (await res.json()) as { connected?: boolean; login?: string };
       setGithubLogin(data.connected && data.login ? data.login : null);
@@ -221,6 +247,10 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    setOnOAuthOrigin(isOnGithubOAuthOrigin());
+  }, []);
+
+  useEffect(() => {
     refreshGithubSession();
 
     const params = new URLSearchParams(window.location.search);
@@ -236,10 +266,11 @@ export default function HomePage() {
   }, [refreshGithubSession]);
 
   const connectGithub = () => {
-    window.location.href = `${basePath}/api/auth/github`;
+    window.location.href = githubOAuthUrl("/api/auth/github");
   };
 
   const disconnectGithub = async () => {
+    if (!isOnGithubOAuthOrigin()) return;
     await fetch(`${basePath}/api/auth/github/disconnect`, { method: "POST" });
     setGithubLogin(null);
   };
@@ -525,8 +556,9 @@ export default function HomePage() {
                   Connect GitHub
                 </button>
                 <p className="github-hint">
-                  Sign in with GitHub to authorize read access. Your token is
-                  stored in an encrypted session cookie on this app only.
+                  {onOAuthOrigin
+                    ? "Sign in with GitHub to authorize read access. Your token is stored in an encrypted session cookie on this app only."
+                    : "GitHub sign-in runs on our stable Vercel URL. You'll be redirected to connect — use that URL when you need GitHub enrichment."}
                 </p>
               </>
             )}

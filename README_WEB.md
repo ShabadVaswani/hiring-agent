@@ -18,18 +18,21 @@ This repo now includes a Next.js + TypeScript implementation of the resume scori
 
 | What | URL |
 |------|-----|
-| Public app (via portfolio) | https://shabadportfolio.vercel.app/hiring-agent |
-| Vercel deployment | https://hiring-agent-lilac.vercel.app/hiring-agent |
+| Custom domain (portfolio) | https://shabad.sbs/hiring-agent |
+| Vercel portfolio | https://shabadportfolio.vercel.app/hiring-agent |
+| App origin (direct) | https://hiring-agent-lilac.vercel.app/hiring-agent |
 | GitHub repo | https://github.com/ShabadVaswani/hiring-agent |
 
-The portfolio at `shabadportfolio.vercel.app` rewrites `/hiring-agent` to the Vercel deployment.
+Both portfolio domains rewrite `/hiring-agent` to the hiring-agent Vercel deployment. Use whichever URL you are already on for browsing and scoring.
+
+**GitHub OAuth** is registered and handled only on the stable Vercel portfolio URL (`shabadportfolio.vercel.app`). Connect GitHub always redirects there, even when you open the app from `shabad.sbs`.
 
 ## One-time production setup (Vercel only)
 
 ### Step 1 — GitHub OAuth app
 
 1. Create a GitHub OAuth App: https://github.com/settings/developers
-2. Register:
+2. Register **Vercel URLs only** (not `shabad.sbs`):
 
 | Field | Value |
 |-------|--------|
@@ -55,8 +58,8 @@ Redeploy after saving env vars.
 
 ### Step 3 — Use the app
 
-1. Open https://shabadportfolio.vercel.app/hiring-agent
-2. Click **Connect GitHub** → authorize
+1. Open https://shabad.sbs/hiring-agent or https://shabadportfolio.vercel.app/hiring-agent
+2. For GitHub enrichment: open the **Vercel portfolio URL**, click **Connect GitHub**, and authorize
 3. Upload resume PDF, paste OpenRouter key, pick a model
 4. Click **Run scoring pipeline**
 
