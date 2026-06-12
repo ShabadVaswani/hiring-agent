@@ -1,3 +1,4 @@
+import { getGithubSession } from "@/lib/auth/github-session";
 import { scoreResumePipeline } from "@/lib/pipeline/score";
 import { NextResponse } from "next/server";
 
@@ -10,9 +11,11 @@ export async function POST(req: Request) {
     const file = form.get("file");
     const model = String(form.get("model") || "").trim();
     const openRouterApiKey = String(form.get("openRouterApiKey") || "").trim();
-    const githubToken = String(form.get("githubToken") || "").trim() || undefined;
     const githubUrlOverride =
       String(form.get("githubUrlOverride") || "").trim() || undefined;
+
+    const githubSession = await getGithubSession().catch(() => null);
+    const githubToken = githubSession?.accessToken;
 
     if (!(file instanceof File)) {
       return NextResponse.json(

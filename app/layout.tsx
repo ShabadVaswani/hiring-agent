@@ -1,6 +1,12 @@
+import { Inter } from "next/font/google";
 import "./globals.css";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
 
 export const metadata: Metadata = {
   title: "Hiring Agent — Resume Scoring",
@@ -10,8 +16,15 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" className={inter.variable} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("theme");if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme: dark)").matches)){document.documentElement.setAttribute("data-theme","dark");}}catch(e){}})();`,
+          }}
+        />
+      </head>
+      <body className={inter.className}>{children}</body>
     </html>
   );
 }

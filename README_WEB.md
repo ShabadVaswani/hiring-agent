@@ -32,13 +32,30 @@ npm run dev
 - Upload a resume PDF
 - Provide OpenRouter API key
 - Choose a model (or type any model slug)
-- Optionally provide GitHub token/override URL
+- Optionally connect GitHub (OAuth) or set a GitHub profile URL override
+
+### GitHub OAuth setup
+
+1. Create a GitHub OAuth App: https://github.com/settings/developers
+2. Set **Authorization callback URL** to:
+   - Local: `http://localhost:3000/api/auth/github/callback`
+   - Production: `https://your-domain/api/auth/github/callback`
+3. Copy `.env.local.example` to `.env.local` and fill in:
+   - `GITHUB_CLIENT_ID`
+   - `GITHUB_CLIENT_SECRET`
+   - `GITHUB_SESSION_SECRET` (random string, 32+ chars)
+   - `NEXT_PUBLIC_APP_URL`
 
 ## Deploy on Vercel
 
 - Import repo in Vercel
 - Framework preset: Next.js
-- No required server env vars (keys are request-scoped from user input)
+- Set environment variables:
+  - `GITHUB_CLIENT_ID`
+  - `GITHUB_CLIENT_SECRET`
+  - `GITHUB_SESSION_SECRET`
+  - `NEXT_PUBLIC_APP_URL` (your Vercel URL)
+- OpenRouter keys are still supplied by each user in the UI
 - Deploy
 
 ## Notes

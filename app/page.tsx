@@ -168,10 +168,12 @@ export default function HomePage() {
   const [model, setModel] = useState(RECOMMENDED_MODELS[0].id);
   const [customModel, setCustomModel] = useState("");
   const [useCustom, setUseCustom] = useState(false);
-  const [githubToken, setGithubToken] = useState("");
+  const [githubLogin, setGithubLogin] = useState<string | null>(null);
+  const [githubLoading, setGithubLoading] = useState(true);
   const [githubUrlOverride, setGithubUrlOverride] = useState("");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [rawOpen, setRawOpen] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [stageIndex, setStageIndex] = useState(0);
@@ -181,11 +183,74 @@ export default function HomePage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const stageTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const refreshGithubSession = useCallback(async () => {
+    setGithubLoading(true);
+    try {
+      const res = await fetch("/api/auth/github/session");
+      const data = (await res.json()) as { connected?: boolean; login?: string };
+      setGithubLogin(data.connected && data.login ? data.login : null);
+    } catch {
+      setGithubLogin(null);
+    } finally {
+      setGithubLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     return () => {
       if (stageTimer.current) clearInterval(stageTimer.current);
     };
   }, []);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("theme");
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const initial =
+      stored === "dark" || stored === "light"
+        ? stored
+        : prefersDark
+          ? "dark"
+          : "light";
+    setTheme(initial);
+    document.documentElement.setAttribute(
+      "data-theme",
+      initial === "dark" ? "dark" : "light",
+    );
+  }, []);
+
+  useEffect(() => {
+    refreshGithubSession();
+
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("github");
+    const message = params.get("message");
+    if (status === "connected") {
+      refreshGithubSession();
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (status === "error") {
+      setError(message || "GitHub connection failed.");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [refreshGithubSession]);
+
+  const connectGithub = () => {
+    window.location.href = "/api/auth/github";
+  };
+
+  const disconnectGithub = async () => {
+    await fetch("/api/auth/github/disconnect", { method: "POST" });
+    setGithubLogin(null);
+  };
+
+  const toggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.setAttribute(
+      "data-theme",
+      next === "dark" ? "dark" : "light",
+    );
+    localStorage.setItem("theme", next);
+  };
 
   const effectiveModel = useCustom ? customModel.trim() : model;
 
@@ -227,7 +292,6 @@ export default function HomePage() {
       form.set("file", file);
       form.set("openRouterApiKey", openRouterApiKey.trim());
       form.set("model", effectiveModel);
-      if (githubToken.trim()) form.set("githubToken", githubToken.trim());
       if (githubUrlOverride.trim()) {
         form.set("githubUrlOverride", githubUrlOverride.trim());
       }
@@ -274,9 +338,19 @@ export default function HomePage() {
             <p>Resume-to-score evaluation, powered by your own models</p>
           </div>
         </div>
-        <div className="masthead-badge">
-          <span className="dot" />
-          Open source &middot; MIT
+        <div className="masthead-actions">
+          <button
+            type="button"
+            className="theme-toggle"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          >
+            {theme === "dark" ? "Light mode" : "Dark mode"}
+          </button>
+          <div className="masthead-badge">
+            <span className="dot" />
+            Open source &middot; MIT
+          </div>
         </div>
       </header>
 
@@ -418,6 +492,44 @@ export default function HomePage() {
             )}
           </div>
 
+          <div className="field">
+            <div className="field-label">
+              GitHub
+              <span className="field-hint">optional · higher API limits</span>
+            </div>
+            {githubLoading ? (
+              <p className="github-hint">Checking GitHub connection…</p>
+            ) : githubLogin ? (
+              <div className="github-connected">
+                <span>
+                  Connected as{" "}
+                  <span className="github-connected-user">@{githubLogin}</span>
+                </span>
+                <button
+                  type="button"
+                  className="btn-link"
+                  onClick={disconnectGithub}
+                >
+                  Disconnect
+                </button>
+              </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={connectGithub}
+                >
+                  Connect GitHub
+                </button>
+                <p className="github-hint">
+                  Sign in with GitHub to authorize read access. Your token is
+                  stored in an encrypted session cookie on this app only.
+                </p>
+              </>
+            )}
+          </div>
+
           {/* Advanced */}
           <div className="field">
             <div className="disclosure">
@@ -426,23 +538,11 @@ export default function HomePage() {
                 className="disclosure-head"
                 onClick={() => setAdvancedOpen((o) => !o)}
               >
-                GitHub options (optional)
+                Advanced options
                 <span className={`chev${advancedOpen ? " open" : ""}`}>▾</span>
               </button>
               {advancedOpen ? (
                 <div className="disclosure-body">
-                  <div className="field">
-                    <div className="field-label">
-                      GitHub token
-                      <span className="field-hint">raises API rate limits</span>
-                    </div>
-                    <input
-                      type="password"
-                      value={githubToken}
-                      onChange={(e) => setGithubToken(e.target.value)}
-                      placeholder="ghp_..."
-                    />
-                  </div>
                   <div className="field">
                     <div className="field-label">
                       GitHub URL override
@@ -467,8 +567,9 @@ export default function HomePage() {
           <div className="privacy-note">
             <span>🔒</span>
             <span>
-              Your API key and GitHub token are sent only to this app&apos;s
-              server for the current request and are never persisted.
+              Your OpenRouter key is sent only for the current request and is
+              never stored. GitHub access uses an encrypted session cookie after
+              you connect.
             </span>
           </div>
         </form>
