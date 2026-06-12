@@ -1,7 +1,7 @@
 import {
   createOAuthState,
   GITHUB_STATE_COOKIE,
-  getAppOrigin,
+  getOAuthCallbackUrl,
 } from "@/lib/auth/github-session";
 import { NextResponse } from "next/server";
 
@@ -16,8 +16,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const origin = getAppOrigin(request);
-  const redirectUri = `${origin}/api/auth/github/callback`;
+  const redirectUri = getOAuthCallbackUrl(request);
   const state = createOAuthState();
 
   const authorizeUrl = new URL("https://github.com/login/oauth/authorize");

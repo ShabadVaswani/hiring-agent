@@ -53,14 +53,31 @@ export async function getGithubSession(): Promise<GithubSession | null> {
   return decryptSession(raw);
 }
 
+export function getBasePath(): string {
+  return (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
+}
+
 export function getAppOrigin(request: Request): string {
   if (process.env.NEXT_PUBLIC_APP_URL) {
     return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
   }
   if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
+    return `https://${process.env.VERCEL_URL}${getBasePath()}`;
   }
-  return new URL(request.url).origin;
+  const { origin, pathname } = new URL(request.url);
+  const basePath = getBasePath();
+  if (basePath && pathname.startsWith(basePath)) {
+    return `${origin}${basePath}`;
+  }
+  return origin;
+}
+
+export function getOAuthCallbackUrl(request: Request): string {
+  return `${getAppOrigin(request)}/api/auth/github/callback`;
+}
+
+export function getAppHomeUrl(request: Request): string {
+  return `${getAppOrigin(request)}/`;
 }
 
 export function createOAuthState(): string {

@@ -2,7 +2,8 @@ import {
   encryptSession,
   GITHUB_AUTH_COOKIE,
   GITHUB_STATE_COOKIE,
-  getAppOrigin,
+  getAppHomeUrl,
+  getOAuthCallbackUrl,
 } from "@/lib/auth/github-session";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
@@ -10,8 +11,7 @@ import { cookies } from "next/headers";
 export const runtime = "nodejs";
 
 function redirectWithError(request: Request, message: string) {
-  const origin = getAppOrigin(request);
-  const url = new URL("/", origin);
+  const url = new URL(getAppHomeUrl(request));
   url.searchParams.set("github", "error");
   url.searchParams.set("message", message);
   return NextResponse.redirect(url);
@@ -42,8 +42,7 @@ export async function GET(request: Request) {
     return redirectWithError(request, "Invalid OAuth state");
   }
 
-  const origin = getAppOrigin(request);
-  const redirectUri = `${origin}/api/auth/github/callback`;
+  const redirectUri = getOAuthCallbackUrl(request);
 
   const tokenResponse = await fetch(
     "https://github.com/login/oauth/access_token",
@@ -97,7 +96,7 @@ export async function GET(request: Request) {
     return redirectWithError(request, "GitHub profile is missing a username");
   }
 
-  const home = new URL("/", origin);
+  const home = new URL(getAppHomeUrl(request));
   home.searchParams.set("github", "connected");
 
   const response = NextResponse.redirect(home);

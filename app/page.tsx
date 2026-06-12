@@ -183,10 +183,12 @@ export default function HomePage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const stageTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
   const refreshGithubSession = useCallback(async () => {
     setGithubLoading(true);
     try {
-      const res = await fetch("/api/auth/github/session");
+      const res = await fetch(`${basePath}/api/auth/github/session`);
       const data = (await res.json()) as { connected?: boolean; login?: string };
       setGithubLogin(data.connected && data.login ? data.login : null);
     } catch {
@@ -194,7 +196,7 @@ export default function HomePage() {
     } finally {
       setGithubLoading(false);
     }
-  }, []);
+  }, [basePath]);
 
   useEffect(() => {
     return () => {
@@ -234,11 +236,11 @@ export default function HomePage() {
   }, [refreshGithubSession]);
 
   const connectGithub = () => {
-    window.location.href = "/api/auth/github";
+    window.location.href = `${basePath}/api/auth/github`;
   };
 
   const disconnectGithub = async () => {
-    await fetch("/api/auth/github/disconnect", { method: "POST" });
+    await fetch(`${basePath}/api/auth/github/disconnect`, { method: "POST" });
     setGithubLogin(null);
   };
 
