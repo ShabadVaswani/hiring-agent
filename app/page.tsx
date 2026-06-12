@@ -232,7 +232,8 @@ export default function HomePage() {
         form.set("githubUrlOverride", githubUrlOverride.trim());
       }
 
-      const res = await fetch("/api/score", { method: "POST", body: form });
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+      const res = await fetch(`${basePath}/api/score`, { method: "POST", body: form });
       const json = (await res.json()) as ApiResponse;
 
       if (res.ok && json.ok && json.result) {
