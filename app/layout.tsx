@@ -8,12 +8,16 @@ const inter = Inter({
   variable: "--font-sans",
 });
 
+const basePath = "/hiring-agent";
+
 export const metadata: Metadata = {
   title: "Hiring Agent — Resume Scoring",
   description:
     "Web UI for HackerRank's open-source Hiring Agent resume evaluation pipeline. Upload a resume, use your own OpenRouter key, and get explainable category-based scores.",
   icons: {
-    icon: "/icon",
+    icon: [{ url: `${basePath}/icon`, type: "image/png" }],
+    shortcut: `${basePath}/icon`,
+    apple: `${basePath}/icon`,
   },
 };
 
