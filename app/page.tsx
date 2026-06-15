@@ -1,5 +1,6 @@
 "use client";
 
+import LogoMark from "@/components/LogoMark";
 import {
   DragEvent,
   FormEvent,
@@ -365,7 +366,7 @@ export default function HomePage() {
     <div className="shell">
       <header className="masthead">
         <div className="brand">
-          <div className="brand-mark">H</div>
+          <LogoMark size={40} className="brand-mark" />
           <div className="brand-text">
             <h1>Hiring Agent</h1>
             <p>Resume-to-score evaluation, powered by your own models</p>

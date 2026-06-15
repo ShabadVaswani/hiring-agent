@@ -12,6 +12,9 @@ export const metadata: Metadata = {
   title: "Hiring Agent — Resume Scoring",
   description:
     "Web UI for HackerRank's open-source Hiring Agent resume evaluation pipeline. Upload a resume, use your own OpenRouter key, and get explainable category-based scores.",
+  icons: {
+    icon: "/icon",
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
