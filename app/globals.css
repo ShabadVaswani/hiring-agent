@@ -567,6 +567,23 @@ select {
   color: var(--text-faint);
 }
 
+.remember-key {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.remember-key input {
+  width: auto;
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+
 .btn-link {
   width: auto;
   border: none;

@@ -2,6 +2,12 @@
 
 import LogoMark from "@/components/LogoMark";
 import {
+  clearStoredOpenRouterKey,
+  loadStoredOpenRouterKey,
+  OPENROUTER_KEY_TTL_DAYS,
+  saveOpenRouterKey,
+} from "@/lib/client/openrouter-key-storage";
+import {
   DragEvent,
   FormEvent,
   useCallback,
@@ -186,6 +192,7 @@ export default function HomePage() {
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [openRouterApiKey, setOpenRouterApiKey] = useState("");
+  const [rememberApiKey, setRememberApiKey] = useState(true);
   const [showKey, setShowKey] = useState(false);
   const [model, setModel] = useState(RECOMMENDED_MODELS[0].id);
   const [customModel, setCustomModel] = useState("");
@@ -230,6 +237,27 @@ export default function HomePage() {
       if (stageTimer.current) clearInterval(stageTimer.current);
     };
   }, []);
+
+  useEffect(() => {
+    const storedKey = loadStoredOpenRouterKey();
+    if (storedKey) {
+      setOpenRouterApiKey(storedKey);
+      setRememberApiKey(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!rememberApiKey) {
+      clearStoredOpenRouterKey();
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      saveOpenRouterKey(openRouterApiKey);
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [openRouterApiKey, rememberApiKey]);
 
   useEffect(() => {
     const stored = localStorage.getItem("theme");
@@ -472,7 +500,7 @@ export default function HomePage() {
           <div className="field">
             <div className="field-label">
               OpenRouter API Key
-              <span className="field-hint">used per request, never stored</span>
+              <span className="field-hint">sent per request, not stored on server</span>
             </div>
             <div className="input-wrap">
               <input
@@ -480,6 +508,7 @@ export default function HomePage() {
                 value={openRouterApiKey}
                 onChange={(e) => setOpenRouterApiKey(e.target.value)}
                 placeholder="sk-or-v1-..."
+                autoComplete="off"
               />
               <button
                 type="button"
@@ -489,6 +518,16 @@ export default function HomePage() {
                 {showKey ? "Hide" : "Show"}
               </button>
             </div>
+            <label className="remember-key">
+              <input
+                type="checkbox"
+                checked={rememberApiKey}
+                onChange={(e) => setRememberApiKey(e.target.checked)}
+              />
+              <span>
+                Remember on this browser for {OPENROUTER_KEY_TTL_DAYS} days
+              </span>
+            </label>
           </div>
 
           {/* Model */}
@@ -602,9 +641,11 @@ export default function HomePage() {
           <div className="privacy-note">
             <span>🔒</span>
             <span>
-              Your OpenRouter key is sent only for the current request and is
-              never stored. GitHub access uses an encrypted session cookie after
-              you connect.
+              Your OpenRouter key is sent to the server only when you run scoring
+              and is never stored server-side. If enabled above, it is saved in
+              this browser&apos;s local storage for {OPENROUTER_KEY_TTL_DAYS}{" "}
+              days. GitHub access uses an encrypted session cookie after you
+              connect.
             </span>
           </div>
         </form>
