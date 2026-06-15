@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
   basePath,
   env: {
     NEXT_PUBLIC_BASE_PATH: basePath,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? "",
   },
 };
 

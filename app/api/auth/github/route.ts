@@ -1,5 +1,6 @@
 import {
   createOAuthState,
+  getConfiguredAppOrigin,
   GITHUB_STATE_COOKIE,
   getOAuthCallbackUrl,
 } from "@/lib/auth/github-session";
@@ -12,6 +13,16 @@ export async function GET(request: Request) {
   if (!clientId) {
     return NextResponse.json(
       { error: "GitHub OAuth is not configured on this deployment" },
+      { status: 503 },
+    );
+  }
+
+  if (process.env.NODE_ENV === "production" && !getConfiguredAppOrigin()) {
+    return NextResponse.json(
+      {
+        error:
+          "NEXT_PUBLIC_APP_URL is not set. Add https://shabadportfolio.vercel.app/hiring-agent on Vercel and redeploy.",
+      },
       { status: 503 },
     );
   }

@@ -57,19 +57,22 @@ export function getBasePath(): string {
   return (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
 }
 
+export function getConfiguredAppOrigin(): string | null {
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "");
+  return configured || null;
+}
+
 export function getAppOrigin(request: Request): string {
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
-  }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}${getBasePath()}`;
-  }
+  const configured = getConfiguredAppOrigin();
+  if (configured) return configured;
+
+  // Local dev only — never use VERCEL_URL in production (preview URLs break OAuth).
   const { origin, pathname } = new URL(request.url);
   const basePath = getBasePath();
   if (basePath && pathname.startsWith(basePath)) {
     return `${origin}${basePath}`;
   }
-  return origin;
+  return `${origin}${basePath}`;
 }
 
 export function getOAuthCallbackUrl(request: Request): string {
