@@ -3,7 +3,6 @@ import { scoreResumePipeline } from "@/lib/pipeline/score";
 import {
   getSharedCooldownStatus,
   SHARED_FREE_MODELS,
-  isSharedModel,
   OpenRouterThrottleError,
   type OpenRouterAuthMode,
 } from "@/lib/rate-limit/openrouter";
@@ -66,37 +65,16 @@ export async function POST(req: Request) {
     if (!model) {
       return NextResponse.json({ error: "Missing model" }, { status: 400 });
     }
-    const usingSharedKey = !openRouterApiKey;
-    if (usingSharedKey && !isSharedModel(model)) {
+    if (!openRouterApiKey) {
       return NextResponse.json(
         {
-          error:
-            "Selected model requires a personal OpenRouter API key. Shared mode only supports Gemma and Llama free models.",
+          error: "Shared model mode is coming soon. Please provide an OpenRouter API key.",
         },
         { status: 400 },
       );
     }
 
-    const effectiveApiKey = usingSharedKey
-      ? String(process.env.OPENROUTER_API_KEY || "").trim()
-      : openRouterApiKey;
-
-    if (!effectiveApiKey) {
-      return NextResponse.json(
-        {
-          error: usingSharedKey
-            ? "Shared model mode is not configured on this deployment."
-            : "Missing OpenRouter API key",
-        },
-        { status: usingSharedKey ? 503 : 400 },
-      );
-    }
-
-    const authMode: OpenRouterAuthMode = usingSharedKey
-      ? "shared"
-      : githubToken
-        ? "byokWithGithub"
-        : "byok";
+    const authMode: OpenRouterAuthMode = githubToken ? "byokWithGithub" : "byok";
     const throttleUserId = githubSession?.login || anonymousId;
 
     const arrayBuffer = await file.arrayBuffer();
@@ -106,7 +84,7 @@ export async function POST(req: Request) {
       fileBuffer: buffer,
       fileName: file.name,
       model,
-      openRouterApiKey: effectiveApiKey,
+      openRouterApiKey,
       githubToken,
       githubUrlOverride,
       githubDataOverride,
@@ -149,6 +127,7 @@ export async function POST(req: Request) {
 export async function GET() {
   const status = getSharedCooldownStatus();
   return NextResponse.json({
+    sharedAvailable: false,
     sharedModels: SHARED_FREE_MODELS,
     sharedCooldownActive: status.active,
     sharedCooldownSec: status.retryAfterSec,

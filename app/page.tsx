@@ -22,14 +22,7 @@ import {
   useState,
 } from "react";
 
-const SHARED_MODELS = [
-  { id: "google/gemma-4-26b-a4b-it:free", label: "Gemma 4 26B A4B", badge: "Free" },
-  {
-    id: "meta-llama/llama-3.2-3b-instruct:free",
-    label: "Llama 3.2 3B Instruct",
-    badge: "Free",
-  },
-];
+// Reserved for shared tier launch: google/gemma-4-26b-a4b-it:free, meta-llama/llama-3.2-3b-instruct:free
 
 const GITHUB_OAUTH_ORIGIN = process.env.NEXT_PUBLIC_APP_URL ?? "";
 
@@ -113,13 +106,6 @@ const ADVANCED_MODELS = [
   { id: "google/gemini-2.5-flash-lite", label: "Gemini Flash Lite" },
   { id: "openai/gpt-4o-mini", label: "GPT-4o mini" },
   { id: "anthropic/claude-3.5-sonnet", label: "Claude 3.5 Sonnet" },
-];
-
-const STAGES = [
-  "Extracting text from PDF",
-  "Parsing resume sections",
-  "Enriching with GitHub",
-  "Evaluating & scoring",
 ];
 
 const UPSTREAM_REPO =
@@ -206,7 +192,6 @@ function CategoryRow({ name, data }: { name: string; data: CategoryScore }) {
 export default function HomePage() {
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [selectedSharedModel, setSelectedSharedModel] = useState(SHARED_MODELS[0].id);
   const [openRouterApiKey, setOpenRouterApiKey] = useState("");
   const [rememberApiKey, setRememberApiKey] = useState(true);
   const [showKey, setShowKey] = useState(false);
@@ -215,22 +200,20 @@ export default function HomePage() {
   const [useCustom, setUseCustom] = useState(false);
   const [githubPat, setGithubPat] = useState("");
   const [rememberGithubPat, setRememberGithubPat] = useState(true);
-  const [sharedCooldownSec, setSharedCooldownSec] = useState(0);
   const [githubLogin, setGithubLogin] = useState<string | null>(null);
   const [githubLoading, setGithubLoading] = useState(true);
   const [githubUrlOverride, setGithubUrlOverride] = useState("");
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [githubOpen, setGithubOpen] = useState(false);
+  const [githubPatOpen, setGithubPatOpen] = useState(false);
   const [rawOpen, setRawOpen] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [onOAuthOrigin, setOnOAuthOrigin] = useState(true);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [stageIndex, setStageIndex] = useState(0);
   const [error, setError] = useState<string>("");
   const [result, setResult] = useState<PipelineResult | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const stageTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
@@ -250,12 +233,6 @@ export default function HomePage() {
       setGithubLoading(false);
     }
   }, [basePath]);
-
-  useEffect(() => {
-    return () => {
-      if (stageTimer.current) clearInterval(stageTimer.current);
-    };
-  }, []);
 
   useEffect(() => {
     const storedKey = loadStoredOpenRouterKey();
@@ -298,25 +275,6 @@ export default function HomePage() {
 
     return () => window.clearTimeout(timer);
   }, [githubPat, rememberGithubPat]);
-
-  useEffect(() => {
-    if (sharedCooldownSec <= 0) return;
-    const id = window.setInterval(() => {
-      setSharedCooldownSec((s) => (s > 1 ? s - 1 : 0));
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [sharedCooldownSec]);
-
-  useEffect(() => {
-    fetch(`${basePath}/api/score`)
-      .then((res) => res.json())
-      .then((data: { sharedCooldownSec?: number }) => {
-        if (Number(data.sharedCooldownSec ?? 0) > 0) {
-          setSharedCooldownSec(Number(data.sharedCooldownSec));
-        }
-      })
-      .catch(() => {});
-  }, [basePath]);
 
   useEffect(() => {
     const stored = localStorage.getItem("theme");
@@ -374,11 +332,17 @@ export default function HomePage() {
   };
 
   const hasPersonalApiKey = Boolean(openRouterApiKey.trim());
-  const effectiveModel = hasPersonalApiKey
-    ? useCustom
-      ? customModel.trim()
-      : model
-    : selectedSharedModel;
+  const effectiveModel = useCustom ? customModel.trim() : model;
+  const canRun = Boolean(file && hasPersonalApiKey && effectiveModel);
+  const runButtonLabel = isSubmitting
+    ? "Running pipeline…"
+    : !file
+      ? "Upload a resume to run"
+      : !hasPersonalApiKey
+        ? "Add your API key to run"
+        : !effectiveModel
+          ? "Choose a model to run"
+          : "Run scoring pipeline";
 
   const fetchGithubDataViaPat = useCallback(
     async (usernameOrUrl: string): Promise<GithubData | null> => {
@@ -469,29 +433,21 @@ export default function HomePage() {
       setError("Please upload a resume PDF first.");
       return;
     }
-    if (hasPersonalApiKey && !effectiveModel) {
-      setError("Please choose or enter a model.");
+    if (!hasPersonalApiKey) {
+      setError("Please enter your OpenRouter API key.");
       return;
     }
-    if (!hasPersonalApiKey && sharedCooldownSec > 0) {
-      setError(
-        `Shared free models are temporarily paused. Try again in ${sharedCooldownSec}s.`,
-      );
+    if (!effectiveModel) {
+      setError("Please choose or enter a model.");
       return;
     }
 
     setIsSubmitting(true);
-    setStageIndex(0);
-    stageTimer.current = setInterval(() => {
-      setStageIndex((prev) => (prev < STAGES.length - 1 ? prev + 1 : prev));
-    }, 4500);
 
     try {
       const form = new FormData();
       form.set("file", file);
-      if (hasPersonalApiKey) {
-        form.set("openRouterApiKey", openRouterApiKey.trim());
-      }
+      form.set("openRouterApiKey", openRouterApiKey.trim());
       form.set("model", effectiveModel);
       if (githubUrlOverride.trim()) {
         form.set("githubUrlOverride", githubUrlOverride.trim());
@@ -506,26 +462,16 @@ export default function HomePage() {
 
       const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
       const res = await fetch(`${basePath}/api/score`, { method: "POST", body: form });
-      const json = (await res.json()) as ApiResponse & {
-        code?: string;
-        retryAfterSec?: number;
-        sharedCooldownSec?: number;
-      };
+      const json = (await res.json()) as ApiResponse;
 
       if (res.ok && json.ok && json.result) {
         setResult(json.result);
       } else {
-        if (json.code === "shared_cooldown" || json.code === "shared_rate_limited") {
-          setSharedCooldownSec(
-            Number(json.sharedCooldownSec || json.retryAfterSec || sharedCooldownSec || 0),
-          );
-        }
         setError(json.error || "Pipeline failed. Please try again.");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error.");
     } finally {
-      if (stageTimer.current) clearInterval(stageTimer.current);
       setIsSubmitting(false);
     }
   };
@@ -608,8 +554,8 @@ export default function HomePage() {
             <span className="step-num">1</span> Configure run
           </h2>
           <p className="panel-sub">
-            Upload a resume, pick a model, and run the full extraction,
-            enrichment, and scoring pipeline.
+            Upload a resume, add your OpenRouter key, pick a model, and run the
+            full extraction, enrichment, and scoring pipeline.
           </p>
 
           {/* Dropzone */}
@@ -651,187 +597,136 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Free shared models */}
+          {/* OpenRouter API key */}
           <div className="field">
             <div className="field-label">
-              Free shared models
-              <span className="field-hint">no API key required</span>
+              OpenRouter API key
+              <span className="field-hint">required</span>
             </div>
-            <div className="free-models">
-              {SHARED_MODELS.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  className={`free-model-card${
-                    selectedSharedModel === m.id ? " active" : ""
-                  }`}
-                  onClick={() => setSelectedSharedModel(m.id)}
-                  disabled={sharedCooldownSec > 0 || isSubmitting}
-                >
-                  <span className="free-model-label">{m.label}</span>
-                  <span className="free-badge">{m.badge}</span>
-                </button>
-              ))}
+            <div className="input-wrap">
+              <input
+                type={showKey ? "text" : "password"}
+                value={openRouterApiKey}
+                onChange={(e) => setOpenRouterApiKey(e.target.value)}
+                placeholder="sk-or-v1-..."
+                autoComplete="off"
+              />
+              <button
+                type="button"
+                className="ghost-btn"
+                onClick={() => setShowKey((s) => !s)}
+              >
+                {showKey ? "Hide" : "Show"}
+              </button>
             </div>
-            {sharedCooldownSec > 0 ? (
-              <p className="github-hint">
-                Shared models are temporarily paused for {sharedCooldownSec}s due
-                to provider throttling.
-              </p>
-            ) : null}
+            <p className="field-key-helper">
+              Don&apos;t have one?{" "}
+              <a
+                href="https://openrouter.ai/keys"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Get a key at openrouter.ai/keys
+              </a>
+            </p>
+            <label className="remember-key">
+              <input
+                type="checkbox"
+                checked={rememberApiKey}
+                onChange={(e) => setRememberApiKey(e.target.checked)}
+              />
+              <span>
+                Remember on this browser for {OPENROUTER_KEY_TTL_DAYS} days
+              </span>
+            </label>
           </div>
 
-          {/* Advanced */}
+          {/* Model */}
+          <div className="field">
+            <div className="field-label">
+              Model
+              <button
+                type="button"
+                className="btn-link field-toggle"
+                onClick={() => setUseCustom((v) => !v)}
+              >
+                {useCustom ? "Use presets" : "Use custom"}
+              </button>
+            </div>
+            {useCustom ? (
+              <input
+                type="text"
+                value={customModel}
+                onChange={(e) => setCustomModel(e.target.value)}
+                placeholder="provider/model-id"
+              />
+            ) : (
+              <div className="seg">
+                {ADVANCED_MODELS.map((m) => (
+                  <button
+                    type="button"
+                    key={m.id}
+                    className={model === m.id ? "active" : ""}
+                    onClick={() => setModel(m.id)}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* GitHub enrichment (optional) */}
           <div className="field">
             <div className="disclosure">
               <button
                 type="button"
                 className="disclosure-head"
-                onClick={() => setAdvancedOpen((o) => !o)}
+                onClick={() => setGithubOpen((o) => !o)}
+                aria-expanded={githubOpen}
               >
-                Advanced options
-                <span className={`chev${advancedOpen ? " open" : ""}`}>▾</span>
+                GitHub enrichment
+                <span className="field-hint disclosure-hint">optional</span>
+                <span className={`chev${githubOpen ? " open" : ""}`}>▾</span>
               </button>
-              {advancedOpen ? (
+              {githubOpen ? (
                 <div className="disclosure-body">
-                  <div className="field">
-                    <div className="field-label">
-                      OpenRouter API key
-                      <span className="field-hint">optional BYOK mode</span>
-                    </div>
-                    <div className="input-wrap">
-                      <input
-                        type={showKey ? "text" : "password"}
-                        value={openRouterApiKey}
-                        onChange={(e) => setOpenRouterApiKey(e.target.value)}
-                        placeholder="sk-or-v1-..."
-                        autoComplete="off"
-                      />
+                  {githubLoading ? (
+                    <p className="github-hint">Checking GitHub connection…</p>
+                  ) : githubLogin ? (
+                    <div className="github-connected">
+                      <span>
+                        Connected as{" "}
+                        <span className="github-connected-user">@{githubLogin}</span>
+                      </span>
                       <button
                         type="button"
-                        className="ghost-btn"
-                        onClick={() => setShowKey((s) => !s)}
+                        className="btn-link"
+                        onClick={disconnectGithub}
                       >
-                        {showKey ? "Hide" : "Show"}
+                        Disconnect
                       </button>
                     </div>
-                    <label className="remember-key">
-                      <input
-                        type="checkbox"
-                        checked={rememberApiKey}
-                        onChange={(e) => setRememberApiKey(e.target.checked)}
-                      />
-                      <span>
-                        Remember on this browser for {OPENROUTER_KEY_TTL_DAYS} days
-                      </span>
-                    </label>
-                  </div>
-
-                  <div className="field">
-                    <div className="field-label">
-                      Advanced model (BYOK only)
-                      <span
-                        className="field-hint"
-                        style={{ cursor: "pointer", color: "var(--primary)" }}
-                        onClick={() => setUseCustom((v) => !v)}
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={connectGithub}
                       >
-                        {useCustom ? "Use presets" : "Use custom"}
-                      </span>
-                    </div>
-                    {useCustom ? (
-                      <input
-                        type="text"
-                        value={customModel}
-                        onChange={(e) => setCustomModel(e.target.value)}
-                        placeholder="provider/model-id"
-                      />
-                    ) : (
-                      <div className="seg">
-                        {ADVANCED_MODELS.map((m) => (
-                          <button
-                            type="button"
-                            key={m.id}
-                            className={model === m.id ? "active" : ""}
-                            onClick={() => setModel(m.id)}
-                          >
-                            {m.label}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                        Connect GitHub
+                      </button>
+                      <p className="github-hint">
+                        {onOAuthOrigin
+                          ? "Sign in with GitHub to authorize read access. Your token is stored in an encrypted session cookie on this app only."
+                          : "GitHub sign-in runs on our stable Vercel URL. You'll be redirected to connect — use that URL when you need GitHub enrichment."}
+                      </p>
+                    </>
+                  )}
 
-                  <div className="field">
+                  <div className="field github-profile-field">
                     <div className="field-label">
-                      GitHub OAuth
-                      <span className="field-hint">optional · higher API limits</span>
-                    </div>
-                    {githubLoading ? (
-                      <p className="github-hint">Checking GitHub connection…</p>
-                    ) : githubLogin ? (
-                      <div className="github-connected">
-                        <span>
-                          Connected as{" "}
-                          <span className="github-connected-user">@{githubLogin}</span>
-                        </span>
-                        <button
-                          type="button"
-                          className="btn-link"
-                          onClick={disconnectGithub}
-                        >
-                          Disconnect
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          className="btn-secondary"
-                          onClick={connectGithub}
-                        >
-                          Connect GitHub
-                        </button>
-                        <p className="github-hint">
-                          {onOAuthOrigin
-                            ? "Sign in with GitHub to authorize read access. Your token is stored in an encrypted session cookie on this app only."
-                            : "GitHub sign-in runs on our stable Vercel URL. You'll be redirected to connect — use that URL when you need GitHub enrichment."}
-                        </p>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="field">
-                    <div className="field-label">
-                      GitHub personal access token
-                      <span className="field-hint">advanced · browser only</span>
-                    </div>
-                    <input
-                      type="password"
-                      value={githubPat}
-                      onChange={(e) => setGithubPat(e.target.value)}
-                      placeholder="github_pat_..."
-                      autoComplete="off"
-                    />
-                    <label className="remember-key">
-                      <input
-                        type="checkbox"
-                        checked={rememberGithubPat}
-                        onChange={(e) => setRememberGithubPat(e.target.checked)}
-                      />
-                      <span>
-                        Remember GitHub PAT for {GITHUB_PAT_TTL_DAYS} days
-                      </span>
-                    </label>
-                    <p className="github-hint">
-                      PAT is stored only in this browser and never sent to Vercel.
-                      No app-level GitHub limit applies in PAT mode, but GitHub&apos;s
-                      own API limits still apply.
-                    </p>
-                  </div>
-
-                  <div className="field">
-                    <div className="field-label">
-                      GitHub URL override
+                      GitHub profile URL
                       <span className="field-hint">if auto-detect misses it</span>
                     </div>
                     <input
@@ -840,22 +735,87 @@ export default function HomePage() {
                       onChange={(e) => setGithubUrlOverride(e.target.value)}
                       placeholder="https://github.com/username"
                     />
+                    <p className="github-hint">
+                      Used for OAuth enrichment and for browser-only PAT lookups.
+                    </p>
+                  </div>
+
+                  <div className="sub-disclosure">
+                    <button
+                      type="button"
+                      className="sub-disclosure-head"
+                      onClick={() => setGithubPatOpen((o) => !o)}
+                      aria-expanded={githubPatOpen}
+                    >
+                      Use a personal access token instead
+                      <span className={`chev${githubPatOpen ? " open" : ""}`}>▾</span>
+                    </button>
+                    {githubPatOpen ? (
+                      <div className="sub-disclosure-body">
+                        <div className="field">
+                          <div className="field-label">
+                            GitHub personal access token
+                            <span className="field-hint">browser only</span>
+                          </div>
+                          <input
+                            type="password"
+                            value={githubPat}
+                            onChange={(e) => setGithubPat(e.target.value)}
+                            placeholder="github_pat_..."
+                            autoComplete="off"
+                          />
+                          <label className="remember-key">
+                            <input
+                              type="checkbox"
+                              checked={rememberGithubPat}
+                              onChange={(e) =>
+                                setRememberGithubPat(e.target.checked)
+                              }
+                            />
+                            <span>
+                              Remember GitHub PAT for {GITHUB_PAT_TTL_DAYS} days
+                            </span>
+                          </label>
+                          <p className="github-hint">
+                            PAT is stored only in this browser and never sent to
+                            Vercel. Add a profile URL above when using PAT mode.
+                            GitHub&apos;s own API limits still apply.
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               ) : null}
             </div>
           </div>
 
-          <button className="btn-primary" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Running pipeline…" : "Run scoring pipeline"}
+          <button
+            className="btn-primary"
+            type="submit"
+            disabled={isSubmitting || !canRun}
+          >
+            {runButtonLabel}
           </button>
+
+          <div className="run-checklist" aria-live="polite">
+            <span className={file ? "done" : ""}>
+              Resume {file ? "✓" : "○"}
+            </span>
+            <span className={hasPersonalApiKey ? "done" : ""}>
+              API key {hasPersonalApiKey ? "✓" : "○"}
+            </span>
+            <span className={effectiveModel ? "done" : ""}>
+              Model {effectiveModel ? "✓" : "○"}
+            </span>
+          </div>
 
           <div className="privacy-note">
             <span>🔒</span>
             <span>
-              Shared mode runs only the two free models through the app server key.
-              Advanced BYOK mode uses your personal OpenRouter key. GitHub OAuth is
-              optional, and GitHub PAT mode stays browser-only.
+              Shared server models are coming soon. For now, runs use your
+              personal OpenRouter key. GitHub OAuth is optional, and GitHub PAT
+              mode stays browser-only.
             </span>
           </div>
         </form>
@@ -864,39 +824,25 @@ export default function HomePage() {
         <div className="results-col">
           {isSubmitting ? (
             <div className="panel panel-pad progress-card">
-              <div>
-                <h2 className="panel-title">Processing</h2>
-                <p className="panel-sub" style={{ marginBottom: 0 }}>
-                  This runs multiple model calls server-side and can take a
-                  little while.
-                </p>
+              <h2 className="panel-title">
+                <span className="step-num">2</span> Results
+              </h2>
+              <p className="panel-sub" style={{ marginBottom: 0 }}>
+                Running the scoring pipeline. This usually takes 30–90 seconds.
+              </p>
+              <div className="bar bar-indeterminate" aria-hidden="true">
+                <div className="bar-fill" />
               </div>
-              <div className="bar">
-                <div
-                  className="bar-fill"
-                  style={{
-                    width: `${((stageIndex + 1) / STAGES.length) * 100}%`,
-                  }}
-                />
-              </div>
-              <div className="stages">
-                {STAGES.map((label, i) => {
-                  const state =
-                    i < stageIndex ? "done" : i === stageIndex ? "active" : "";
-                  return (
-                    <div key={label} className={`stage ${state}`}>
-                      <div className="stage-ico">
-                        {i < stageIndex ? "✓" : i + 1}
-                      </div>
-                      <div className="stage-label">{label}</div>
-                      {i === stageIndex ? <div className="spinner" /> : null}
-                    </div>
-                  );
-                })}
+              <div className="progress-working">
+                <div className="spinner" aria-hidden="true" />
+                <span>Working…</span>
               </div>
             </div>
           ) : error ? (
             <div className="panel panel-pad">
+              <h2 className="panel-title">
+                <span className="step-num">2</span> Results
+              </h2>
               <div className="alert">
                 <span>⚠️</span>
                 <div>{error}</div>
@@ -904,6 +850,9 @@ export default function HomePage() {
             </div>
           ) : result && evalData ? (
             <div className="results">
+              <h2 className="panel-title results-heading">
+                <span className="step-num">2</span> Results
+              </h2>
               {/* Score hero */}
               <div className="panel panel-pad">
                 <div className="score-hero">
@@ -1087,8 +1036,11 @@ export default function HomePage() {
               </div>
             </div>
           ) : (
-            <div className="empty">
-              <div>
+            <div className="empty panel panel-pad">
+              <h2 className="panel-title">
+                <span className="step-num">2</span> Results
+              </h2>
+              <div className="empty-body">
                 <div className="empty-icon">📊</div>
                 <h3>No evaluation yet</h3>
                 <p>
