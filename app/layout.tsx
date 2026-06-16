@@ -8,16 +8,17 @@ const inter = Inter({
   variable: "--font-sans",
 });
 
-const basePath = "/hiring-agent";
+const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
+const iconUrl = `${basePath}/icon`;
 
 export const metadata: Metadata = {
   title: "Hiring Agent — Resume Scoring",
   description:
     "Web UI for HackerRank's open-source Hiring Agent resume evaluation pipeline. Upload a resume, use your own OpenRouter key, and get explainable category-based scores.",
   icons: {
-    icon: [{ url: `${basePath}/icon`, type: "image/png" }],
-    shortcut: `${basePath}/icon`,
-    apple: `${basePath}/icon`,
+    icon: [{ url: iconUrl, type: "image/png" }],
+    shortcut: iconUrl,
+    apple: iconUrl,
   },
 };
 
