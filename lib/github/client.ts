@@ -1,12 +1,15 @@
 import type { GitHubData } from "@/lib/schemas/types";
 import { openRouterChat, parseJsonFromModelText } from "@/lib/openrouter/client";
 import { TemplateManager } from "@/lib/prompts/loader";
+import type { OpenRouterAuthMode } from "@/lib/rate-limit/openrouter";
 
 export type OpenRouterContext = {
   apiKey: string;
   model: string;
   temperature?: number;
   top_p?: number;
+  authMode?: OpenRouterAuthMode;
+  throttleUserId?: string;
 };
 
 function extractGithubUsername(githubUrl: string): string | null {
@@ -131,6 +134,8 @@ export async function fetchAndSelectGithubInfo(
       model: context.model,
       temperature: context.temperature ?? 0.1,
       top_p: context.top_p ?? 0.9,
+      authMode: context.authMode,
+      throttleUserId: context.throttleUserId,
       messages: [
         {
           role: "system",

@@ -1,3 +1,9 @@
+import {
+  assertCanCallOpenRouter,
+  type OpenRouterAuthMode,
+  recordOpenRouterProviderRateLimit,
+} from "@/lib/rate-limit/openrouter";
+
 type ChatMessage = {
   role: "system" | "user" | "assistant";
   content: string;
@@ -10,6 +16,8 @@ export type OpenRouterChatRequest = {
   temperature?: number;
   top_p?: number;
   responseFormat?: "json_object";
+  authMode?: OpenRouterAuthMode;
+  throttleUserId?: string;
 };
 
 function cleanJsonText(value: string): string {
@@ -62,6 +70,10 @@ export function parseJsonFromModelText<T>(raw: string): T {
 export async function openRouterChat(
   req: OpenRouterChatRequest,
 ): Promise<string> {
+  const authMode = req.authMode ?? "byok";
+  const throttleUserId = req.throttleUserId ?? "anonymous";
+  assertCanCallOpenRouter(authMode, throttleUserId);
+
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -80,6 +92,9 @@ export async function openRouterChat(
   });
 
   if (!response.ok) {
+    if (response.status === 429) {
+      recordOpenRouterProviderRateLimit(authMode);
+    }
     const text = await response.text();
     throw new Error(`OpenRouter error (${response.status}): ${text}`);
   }

@@ -9,6 +9,7 @@ import {
   type GitHubData,
   type JSONResume,
 } from "@/lib/schemas/types";
+import type { OpenRouterAuthMode } from "@/lib/rate-limit/openrouter";
 import {
   convertGithubDataToText,
   convertJsonResumeToText,
@@ -23,6 +24,9 @@ type ScoreInput = {
   model: string;
   githubToken?: string;
   githubUrlOverride?: string;
+  githubDataOverride?: GitHubData | null;
+  authMode: OpenRouterAuthMode;
+  throttleUserId: string;
 };
 
 type ExtractionSection =
@@ -46,6 +50,8 @@ const MODEL_PARAMETERS: Record<string, { temperature: number; top_p: number }> =
   "google/gemini-2.5-flash": { temperature: 0.1, top_p: 0.9 },
   "google/gemini-2.5-flash-lite": { temperature: 0.1, top_p: 0.9 },
   "openai/gpt-4o-mini": { temperature: 0.1, top_p: 0.9 },
+  "google/gemma-4-26b-a4b-it:free": { temperature: 0.1, top_p: 0.9 },
+  "meta-llama/llama-3.2-3b-instruct:free": { temperature: 0.1, top_p: 0.9 },
 };
 
 function modelParamsFor(model: string): { temperature: number; top_p: number } {
@@ -71,6 +77,7 @@ async function extractSection(
   resumeText: string,
   model: string,
   apiKey: string,
+  context: { authMode: OpenRouterAuthMode; throttleUserId: string },
 ): Promise<Partial<JSONResume>> {
   const sectionPrompt = await templateManager.renderTemplate(sectionName, {
     text_content: resumeText,
@@ -85,6 +92,8 @@ async function extractSection(
     model,
     temperature: modelParams.temperature,
     top_p: modelParams.top_p,
+    authMode: context.authMode,
+    throttleUserId: context.throttleUserId,
     responseFormat: "json_object",
     messages: [
       { role: "system", content: sectionSystemMessage },
@@ -102,6 +111,7 @@ async function evaluateResume(
   resumeText: string,
   model: string,
   apiKey: string,
+  context: { authMode: OpenRouterAuthMode; throttleUserId: string },
 ): Promise<EvaluationData> {
   const systemMessage = await templateManager.renderTemplate(
     "resume_evaluation_system_message",
@@ -117,6 +127,8 @@ async function evaluateResume(
     model,
     temperature: modelParams.temperature,
     top_p: modelParams.top_p,
+    authMode: context.authMode,
+    throttleUserId: context.throttleUserId,
     responseFormat: "json_object",
     messages: [
       { role: "system", content: systemMessage },
@@ -151,6 +163,7 @@ export async function scoreResumePipeline(input: ScoreInput): Promise<{
       resumeText,
       input.model,
       input.openRouterApiKey,
+      input,
     );
     sectionOutputs.push(section);
   }
@@ -159,18 +172,24 @@ export async function scoreResumePipeline(input: ScoreInput): Promise<{
   const resumeData = jsonResumeSchema.parse(mergedResume);
 
   let githubData: GitHubData | null = null;
-  const githubUrl =
-    input.githubUrlOverride || findProfileByNetwork(resumeData, "github");
-  if (githubUrl) {
-    githubData = await fetchAndSelectGithubInfo(
-      githubUrl,
-      {
-        apiKey: input.openRouterApiKey,
-        model: input.model,
-        ...modelParamsFor(input.model),
-      },
-      input.githubToken,
-    );
+  if (input.githubDataOverride) {
+    githubData = input.githubDataOverride;
+  } else {
+    const githubUrl =
+      input.githubUrlOverride || findProfileByNetwork(resumeData, "github");
+    if (githubUrl) {
+      githubData = await fetchAndSelectGithubInfo(
+        githubUrl,
+        {
+          apiKey: input.openRouterApiKey,
+          model: input.model,
+          ...modelParamsFor(input.model),
+          authMode: input.authMode,
+          throttleUserId: input.throttleUserId,
+        },
+        input.githubToken,
+      );
+    }
   }
 
   let evaluationInputText = convertJsonResumeToText(resumeData);
@@ -183,6 +202,7 @@ export async function scoreResumePipeline(input: ScoreInput): Promise<{
     evaluationInputText,
     input.model,
     input.openRouterApiKey,
+    input,
   );
 
   const maxScore =

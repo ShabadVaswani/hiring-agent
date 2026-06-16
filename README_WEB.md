@@ -51,17 +51,36 @@ In the **hiring-agent** Vercel project → Settings → Environment Variables:
 | `GITHUB_CLIENT_SECRET` | From Step 1 |
 | `GITHUB_SESSION_SECRET` | Long random string (32+ chars) |
 | `NEXT_PUBLIC_APP_URL` | `https://shabadportfolio.vercel.app/hiring-agent` |
+| `OPENROUTER_API_KEY` | Shared app key for free default models |
 
 Redeploy after saving env vars.
 
-**Not needed on Vercel:** OpenRouter API key — each user enters their own in the UI.
+Users can still provide their own OpenRouter API key in Advanced settings.
 
 ### Step 3 — Use the app
 
 1. Open https://shabad.sbs/hiring-agent or https://shabadportfolio.vercel.app/hiring-agent
-2. For GitHub enrichment: open the **Vercel portfolio URL**, click **Connect GitHub**, and authorize
-3. Upload resume PDF, paste OpenRouter key, pick a model
-4. Click **Run scoring pipeline**
+2. Choose one of the free shared default models:
+   - `Gemma 4 26B A4B (free)`
+   - `Llama 3.2 3B Instruct (free)`
+3. (Optional) Open Advanced settings:
+   - add your own OpenRouter key (BYOK mode)
+   - connect GitHub OAuth
+   - or add a GitHub PAT for browser-only GitHub requests
+4. Upload resume PDF and click **Run scoring pipeline**
+
+## Rate limits and cooldown
+
+- Shared free models are protected by app-level throttling:
+  - `5` OpenRouter calls/minute per user
+  - after repeated provider rate limits (`429`), shared models are paused for `10` minutes
+- BYOK + GitHub OAuth mode:
+  - `25` OpenRouter calls/minute per user
+- BYOK without GitHub OAuth:
+  - no app-level OpenRouter limit
+- GitHub PAT mode:
+  - PAT stays in browser storage (optional 30-day remember)
+  - no app-level GitHub limit, but GitHub provider limits still apply
 
 ## Run locally (optional)
 
@@ -87,3 +106,4 @@ npm run dev
 - Prompt templates are reused directly from `prompts/templates`.
 - For best JSON reliability, use stronger instruction-following models.
 - Vercel Hobby caps API routes at **60 seconds**. The pipeline makes ~8 LLM calls — use a fast model if you hit timeouts.
+- Shared free models are allowlisted server-side; arbitrary model IDs are rejected unless user BYOK is provided.

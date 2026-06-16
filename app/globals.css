@@ -463,6 +463,58 @@ select {
   box-shadow: 0 1px 2px rgba(40, 38, 31, 0.08);
 }
 
+.free-models {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.free-model-card {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  width: 100%;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.free-model-card:hover {
+  border-color: var(--text-faint);
+  background: var(--surface-3);
+}
+
+.free-model-card.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.free-model-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.free-model-label {
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.free-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--good);
+  border: 1px solid var(--good-border);
+  background: var(--good-bg);
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
 /* Disclosure */
 .disclosure {
   border: 1px solid var(--border);
@@ -1120,5 +1172,8 @@ pre.raw {
   }
   .brand-text h1 {
     font-size: 18px;
+  }
+  .free-models {
+    grid-template-columns: 1fr;
   }
 }
